@@ -92,8 +92,6 @@ int checkSitting(double d) {
     sitcounter--;
   }
 
-  printf("%d : %d\n", sitcounter, sitting);
-
   if (d <= 110 && sitcounter == 5 && sitting != Sitting) {
     digitalWrite(LED, HIGH); 
     sitting = Sitting;
