@@ -2,9 +2,12 @@
 #include <sys/time.h>
 #include <stdio.h>
 
-int ECHO = 6;
-int TRIG = 5;
-int LED = 23;
+const int ECHO = 6;
+const int TRIG = 5;
+const int LED = 23;
+
+int sitting = 0;
+int sitcounter = 0;
 
 double getDistance() {
   struct timeval t1, t2;
@@ -31,14 +34,26 @@ double getDistance() {
   return distance;
 }
 
+// check if we're sitting down
+// by referencing the distance
+// and confirming a sit by five
+// seconds of it being within range
+//
 int checkSitting(double d) {
-  int sitting = 0;
+  if (d <= 90 && sitcounter < 5) {
+    sitcounter++;
+  }
+  if (d > 90 && sitcounter > 0) {
+    sitcounter--;
+  }
 
-  if (d <= 90 && sitting == 0) {
-    digitalWrite(LED, 1);
+  printf("%d : %d\n", sitcounter, sitting);
+
+  if (d <= 90 && sitcounter == 5 && sitting == 0) {
+    digitalWrite(LED, 1); 
     sitting = 1;
   }
-  if (d > 90) {
+  if (d > 90 && sitcounter == 0 && sitting == 1) {
     digitalWrite(LED, 0);
     sitting = 0;
   }
@@ -48,7 +63,8 @@ int checkSitting(double d) {
 
 int main() {
   double dist;
-  int  sitting;
+  int sitting;
+  struct timeval lt, ct;
 
   wiringPiSetup();
   wiringPiSetupGpio();
@@ -57,7 +73,7 @@ int main() {
   while (1) {
     dist = getDistance();
     sitting = checkSitting(dist);
-    if (sitting) {}
+    // set up watchdog here to 
     delay(1000);
   }
 
