@@ -1,14 +1,59 @@
 #include <wiringPi.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <stdio.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <syslog.h>
 
 const int ECHO = 6;
 const int TRIG = 5;
 const int LED = 23;
 
-int sitting = 0;
 int sitcounter = 0;
 
+enum status{NotAtDesk,Sitting,Unknown};
+enum status sitting;
+
+// create daemon process so it runs in the background
+// and reports sit/stands via syslog another tool can
+// utilize syslog for reporting
+//
+static void daemonize() {
+  pid_t pid;
+
+  pid = fork();
+
+  if (pid < 0) exit(EXIT_FAILURE);
+  if (pid > 0) exit(EXIT_SUCCESS);
+  if (setsid() < 0) exit(EXIT_FAILURE);
+
+  signal(SIGCHLD, SIG_IGN);
+  signal(SIGHUP, SIG_IGN);
+
+  pid = fork();
+
+  if (pid < 0) exit(EXIT_FAILURE);
+  if (pid > 0) exit(EXIT_SUCCESS);
+
+  umask(0);
+  chdir("/");
+
+  int x;
+  for (x = sysconf(_SC_OPEN_MAX); x >= 0; x--) {
+    close(x);
+  }
+
+  openlog("sitmon", LOG_PID, LOG_DAEMON);
+}
+
+// calculate distance in cm from the
+// sensor. a good range is up to 133cm
+// outside of that it's not very exact
+// less than 110cm is considered sitting
+// within range
+//
 double getDistance() {
   struct timeval t1, t2;
   double elapsedTime, distance;
@@ -40,28 +85,33 @@ double getDistance() {
 // seconds of it being within range
 //
 int checkSitting(double d) {
-  if (d <= 90 && sitcounter < 5) {
+  if (d <= 110 && sitcounter < 5) {
     sitcounter++;
   }
-  if (d > 90 && sitcounter > 0) {
+  if (d > 110 && sitcounter > 0) {
     sitcounter--;
   }
 
   printf("%d : %d\n", sitcounter, sitting);
 
-  if (d <= 90 && sitcounter == 5 && sitting == 0) {
-    digitalWrite(LED, 1); 
-    sitting = 1;
+  if (d <= 110 && sitcounter == 5 && sitting != Sitting) {
+    digitalWrite(LED, HIGH); 
+    sitting = Sitting;
+    syslog(LOG_INFO, "Sat down.");
   }
-  if (d > 90 && sitcounter == 0 && sitting == 1) {
-    digitalWrite(LED, 0);
-    sitting = 0;
+  if (d > 110 && sitcounter == 0 && sitting != NotAtDesk) {
+    digitalWrite(LED, LOW);
+    sitting = NotAtDesk;
+    syslog(LOG_INFO, "Got up.");
   }
 
   return sitting;
 }
 
+
 int main() {
+  daemonize();
+
   double dist;
   int sitting;
   struct timeval lt, ct;
@@ -69,6 +119,9 @@ int main() {
   wiringPiSetup();
   wiringPiSetupGpio();
   pinMode(LED, OUTPUT);
+  digitalWrite(LED, LOW);
+
+  syslog(LOG_NOTICE, "Sitlog started.");
 
   while (1) {
     dist = getDistance();
@@ -77,5 +130,8 @@ int main() {
     delay(1000);
   }
 
-  return 0;
+  syslog(LOG_NOTICE, "Sitlog terminated.");
+  closelog();
+
+  return EXIT_SUCCESS;
 }
