@@ -15,10 +15,11 @@ static int TRIG = 5;
 static int LED = 23;
 
 static int INRANGE = 90;
+static int HYSTERESIS = 30;
 
 int sitcounter = 0;
 
-enum status{NotAtDesk,Sitting,Unknown};
+enum status{Away,Here,Unknown};
 enum status sitting;
 
 void logMessage(filename,message)
@@ -125,21 +126,21 @@ double getDistance() {
 // seconds of it being within range
 //
 int checkSitting(double d) {
-  if (d <= INRANGE && sitcounter < 10) {
+  if (d <= INRANGE && sitcounter < HYSTERESIS) {
     sitcounter++;
   }
   if (d > INRANGE && sitcounter > 0) {
     sitcounter--;
   }
 
-  if (d <= INRANGE && sitcounter == 5 && sitting != Sitting) {
+  if (d <= INRANGE && sitcounter == HYSTERESIS && sitting != Here) {
     digitalWrite(LED, HIGH); 
-    sitting = Sitting;
+    sitting = Here;
     logMessage(LOGF, "sat");
   }
-  if (d > INRANGE && sitcounter == 0 && sitting != NotAtDesk) {
+  if (d > INRANGE && sitcounter == 0 && sitting != Away) {
     digitalWrite(LED, LOW);
-    sitting = NotAtDesk;
+    sitting = Away;
     logMessage(LOGF, "stood");
   }
 
