@@ -1,5 +1,6 @@
 #include <wiringPi.h>
 #include <sys/time.h>
+#include <time.h>
 #include <sys/stat.h>
 #include <stdio.h>
 #include <signal.h>
@@ -7,14 +8,51 @@
 #include <unistd.h>
 #include <syslog.h>
 
-const int ECHO = 6;
-const int TRIG = 5;
-const int LED = 23;
+#define LOGF "/home/monk/log/sitmon.log"
+
+static int ECHO = 6;
+static int TRIG = 5;
+static int LED = 23;
+
+static int INRANGE = 90;
 
 int sitcounter = 0;
 
 enum status{NotAtDesk,Sitting,Unknown};
 enum status sitting;
+
+void logMessage(filename,message)
+char *filename;
+char *message;
+{
+  char ctn[1000];
+  time_t t = time(NULL);
+  struct tm *p = localtime(&t);
+  strftime(ctn, 1000, "%F %k:%M", p);
+
+  FILE *logfile;
+  logfile=fopen(filename,"a+");
+  if(!logfile) return;
+  fprintf(logfile,"%s -- %s\n",ctn, message);
+  fclose(logfile);
+}
+
+void sigHandler(sig)
+  int sig;
+{
+  switch(sig) {
+    case SIGTERM:
+      logMessage(LOGF, "stopped");
+      digitalWrite(LED, LOW);
+      exit(0);
+      break;
+    case SIGINT:
+      logMessage(LOGF, "stopped");
+      digitalWrite(LED, LOW);
+      exit(0);
+      break;
+  }
+}
 
 // create daemon process so it runs in the background
 // and reports sit/stands via syslog another tool can
@@ -31,6 +69,8 @@ static void daemonize() {
 
   signal(SIGCHLD, SIG_IGN);
   signal(SIGHUP, SIG_IGN);
+  signal(SIGINT, &sigHandler);
+  signal(SIGTERM, &sigHandler);
 
   pid = fork();
 
@@ -45,7 +85,7 @@ static void daemonize() {
     close(x);
   }
 
-  openlog("sitmon", LOG_PID, LOG_DAEMON);
+  logMessage(LOGF, "started");
 }
 
 // calculate distance in cm from the
@@ -81,26 +121,26 @@ double getDistance() {
 
 // check if we're sitting down
 // by referencing the distance
-// and confirming a sit by five
+// and confirming a sit by ten
 // seconds of it being within range
 //
 int checkSitting(double d) {
-  if (d <= 110 && sitcounter < 5) {
+  if (d <= INRANGE && sitcounter < 10) {
     sitcounter++;
   }
-  if (d > 110 && sitcounter > 0) {
+  if (d > INRANGE && sitcounter > 0) {
     sitcounter--;
   }
 
-  if (d <= 110 && sitcounter == 5 && sitting != Sitting) {
+  if (d <= INRANGE && sitcounter == 5 && sitting != Sitting) {
     digitalWrite(LED, HIGH); 
     sitting = Sitting;
-    syslog(LOG_INFO, "Sat down.");
+    logMessage(LOGF, "sat");
   }
-  if (d > 110 && sitcounter == 0 && sitting != NotAtDesk) {
+  if (d > INRANGE && sitcounter == 0 && sitting != NotAtDesk) {
     digitalWrite(LED, LOW);
     sitting = NotAtDesk;
-    syslog(LOG_INFO, "Got up.");
+    logMessage(LOGF, "stood");
   }
 
   return sitting;
@@ -119,8 +159,6 @@ int main() {
   pinMode(LED, OUTPUT);
   digitalWrite(LED, LOW);
 
-  syslog(LOG_NOTICE, "Sitlog started.");
-
   while (1) {
     dist = getDistance();
     sitting = checkSitting(dist);
@@ -128,8 +166,7 @@ int main() {
     delay(1000);
   }
 
-  syslog(LOG_NOTICE, "Sitlog terminated.");
-  closelog();
+  logMessage(LOGF, "stopped");
 
   return EXIT_SUCCESS;
 }
