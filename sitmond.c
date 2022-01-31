@@ -28,12 +28,12 @@ char *message;
   char ctn[1000];
   time_t t = time(NULL);
   struct tm *p = localtime(&t);
-  strftime(ctn, 1000, "%F %k:%M", p);
+  strftime(ctn, 1000, "%-k:%M,%F", p);
 
   FILE *logfile;
   logfile=fopen(filename,"a+");
   if(!logfile) return;
-  fprintf(logfile,"%s -- %s\n",ctn, message);
+  fprintf(logfile,"%s,%s\n",ctn, message);
   fclose(logfile);
 }
 
