@@ -1,0 +1,22 @@
+{
+  "name": "sitmonitor",
+  "version": "1.0.0",
+  "description": "A daemon process that monitors my sitting via an ultrasonic sensor (RCWL-1601) recording sit/stand events.",
+  "main": "log.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forrestbaer/sitting_monitor.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/forrestbaer/sitting_monitor/issues"
+  },
+  "homepage": "https://github.com/forrestbaer/sitting_monitor#readme",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  }
+}
